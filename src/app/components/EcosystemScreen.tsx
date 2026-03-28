@@ -1,13 +1,52 @@
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { Activity, Wind } from 'lucide-react';
+import { Wind } from 'lucide-react';
 
-const NAV_ITEMS = [
-  { label: 'Memory', emoji: '🌳', path: '/memory', left: '8%', top: '38%', color: '#4ade80' },
-  { label: 'Focus', emoji: '🌊', path: '/focus', left: '52%', top: '67%', color: '#38bdf8' },
-  { label: 'Reaction', emoji: '🐾', path: '/reaction', left: '72%', top: '50%', color: '#fb923c' },
-  { label: 'Cognitive\nLoad', emoji: '🪨', path: '/cognitive', left: '10%', top: '70%', color: '#a78bfa' },
-];
+function HotspotButton({ label, onClick, style, icon }: {
+  label: string;
+  onClick: () => void;
+  style: React.CSSProperties;
+  icon?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="absolute flex flex-col items-center active:scale-95 transition-transform"
+      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', ...style }}
+    >
+      <div style={{
+        width: 80, height: 80,
+        background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)',
+        // borderRadius: 14,
+        // border: '1.5px solid rgba(255,255,255,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'visible',
+      }}>
+        {icon && (
+          <img
+            src={icon}
+            alt={label}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        )}
+      </div>
+      <span style={{
+        marginTop: 5,
+        background: 'rgba(0,0,0,0.52)',
+        backdropFilter: 'blur(6px)',
+        color: '#fff',
+        fontSize: '11px',
+        fontWeight: 600,
+        padding: '2px 10px',
+        borderRadius: 20,
+        letterSpacing: '0.05em',
+        whiteSpace: 'nowrap',
+      }}>
+        {label}
+      </span>
+    </button>
+  );
+}
 
 export function EcosystemScreen() {
   const navigate = useNavigate();
@@ -30,165 +69,58 @@ export function EcosystemScreen() {
         }}
       />
 
-      {/* ——— INTERACTIVE OVERLAY ELEMENTS ——— */}
-
-      {/* Memory (Trees — left) */}
-      <button
+      {/* Memory — over the left tree cluster */}
+      <HotspotButton
+        label="Memory"
         onClick={() => navigate('/memory')}
-        className="absolute flex flex-col items-center gap-1 active:scale-95 transition-transform"
-        style={{ left: '6%', top: '34%' }}
-      >
-        <div
-          style={{
-            width: 80, height: 80, borderRadius: 20, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 36,
-            background: 'rgba(10,30,16,0.55)', backdropFilter: 'blur(8px)',
-            border: '1.5px solid rgba(74,222,128,0.3)',
-            boxShadow: '0 0 20px rgba(74,222,128,0.12)',
-          }}
-        >
-          🌳
-        </div>
-        <span
-          style={{
-            background: 'rgba(74,222,128,0.18)', color: '#86efac',
-            fontSize: '11px', padding: '2px 10px', borderRadius: 20,
-            border: '1px solid rgba(74,222,128,0.25)', backdropFilter: 'blur(6px)',
-          }}
-        >
-          Memory
-        </span>
-      </button>
+        style={{ left: '7%', top: '32%' }}
+        icon="/images/plant.png"
+      />
 
-      {/* Focus (River — center) */}
-      <button
-        onClick={() => navigate('/focus')}
-        className="absolute flex flex-col items-center gap-1 active:scale-95 transition-transform"
-        style={{ left: '50%', top: '62%', transform: 'translateX(-50%)' }}
-      >
-        <div
-          style={{
-            width: 80, height: 80, borderRadius: 20, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 36,
-            background: 'rgba(10,20,30,0.55)', backdropFilter: 'blur(8px)',
-            border: '1.5px solid rgba(56,189,248,0.3)',
-            boxShadow: '0 0 20px rgba(56,189,248,0.12)',
-          }}
-        >
-          🌊
-        </div>
-        <span
-          style={{
-            background: 'rgba(56,189,248,0.18)', color: '#7dd3fc',
-            fontSize: '11px', padding: '2px 10px', borderRadius: 20,
-            border: '1px solid rgba(56,189,248,0.25)', backdropFilter: 'blur(6px)',
-          }}
-        >
-          Focus
-        </span>
-      </button>
-
-      {/* Reaction (Animal — right) */}
-      <button
+      {/* Reaction — over the moose drinking at the water's edge */}
+      <HotspotButton
+        label="Reaction"
         onClick={() => navigate('/reaction')}
-        className="absolute flex flex-col items-center gap-1 active:scale-95 transition-transform"
-        style={{ right: '6%', top: '45%' }}
-      >
-        <div
-          style={{
-            width: 80, height: 80, borderRadius: 20, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 36,
-            background: 'rgba(30,20,10,0.55)', backdropFilter: 'blur(8px)',
-            border: '1.5px solid rgba(251,146,60,0.3)',
-            boxShadow: '0 0 20px rgba(251,146,60,0.1)',
-          }}
-        >
-          🐾
-        </div>
-        <span
-          style={{
-            background: 'rgba(251,146,60,0.18)', color: '#fdba74',
-            fontSize: '11px', padding: '2px 10px', borderRadius: 20,
-            border: '1px solid rgba(251,146,60,0.25)', backdropFilter: 'blur(6px)',
-          }}
-        >
-          Reaction
-        </span>
-      </button>
+        style={{ left: '30%', top: '52%' }}
+        icon="/images/deer.png"
+      />
 
-      {/* Cognitive Load (Rocks — bottom left) */}
-      <button
-        onClick={() => navigate('/cognitive')}
-        className="absolute flex flex-col items-center gap-1 active:scale-95 transition-transform"
-        style={{ left: '5%', top: '67%' }}
-      >
-        <div
-          style={{
-            width: 80, height: 80, borderRadius: 20, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 36,
-            background: 'rgba(20,15,30,0.55)', backdropFilter: 'blur(8px)',
-            border: '1.5px solid rgba(167,139,250,0.3)',
-            boxShadow: '0 0 20px rgba(167,139,250,0.1)',
-          }}
-        >
-          🪨
-        </div>
-        <span
-          style={{
-            background: 'rgba(167,139,250,0.18)', color: '#c4b5fd',
-            fontSize: '11px', padding: '2px 10px', borderRadius: 20,
-            border: '1px solid rgba(167,139,250,0.25)', backdropFilter: 'blur(6px)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Cog. Load
-        </span>
-      </button>
+      {/* Focus — over the river / lake */}
+      <HotspotButton
+        label="Focus"
+        onClick={() => navigate('/focus')}
+        style={{ left: '50%', top: '64%', transform: 'translateX(-50%)' }}
+        icon="/images/stone.png"
+      />
 
-      {/* Your Health (Human — center) */}
-      <button
+      {/* Your Health — over the human figure (center clearing) */}
+      <HotspotButton
+        label="Your Health"
         onClick={() => navigate('/dashboard')}
-        className="absolute flex flex-col items-center gap-1 active:scale-95 transition-transform"
         style={{ left: '50%', top: '44%', transform: 'translateX(-50%)' }}
-      >
-        <div
-          style={{
-            width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(14,165,233,0.12)', backdropFilter: 'blur(8px)',
-            border: '1.5px solid rgba(56,189,248,0.4)',
-            boxShadow: '0 0 24px rgba(56,189,248,0.2)',
-          }}
-        >
-          <Activity size={28} color="#38bdf8" />
-        </div>
-        <span
-          style={{
-            background: 'rgba(56,189,248,0.18)', color: '#7dd3fc',
-            fontSize: '11px', padding: '2px 10px', borderRadius: 20,
-            border: '1px solid rgba(56,189,248,0.3)', backdropFilter: 'blur(6px)',
-          }}
-        >
-          Your Health
-        </span>
-      </button>
+        icon="/images/dashboard.png"
+      />
+
+      {/* Cognitive Load — over the right-side rocks / boulder area */}
+      <HotspotButton
+        label="Cog. Load"
+        onClick={() => navigate('/cognitive')}
+        style={{ right: '7%', top: '52%' }}
+        icon="/images/bird.png"
+      />
 
       {/* Top header */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 pt-5 z-20">
-        <div>
-          <p style={{ color: '#4ade80', fontSize: '11px', letterSpacing: '0.08em', margin: 0 }}>ECOSYSTEM</p>
-          <h2 style={{ color: '#d1fae5', fontSize: '18px', margin: 0, fontWeight: 400 }}>Your Environment</h2>
-        </div>
         <button
           onClick={() => navigate('/meditation')}
           className="flex items-center gap-2 px-3 py-2.5 rounded-2xl active:scale-95 transition-transform"
           style={{
-            background: 'rgba(7,24,18,0.7)', backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(74,222,128,0.2)',
+            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.2)',
           }}
         >
-          <Wind size={16} color="#4ade80" />
-          <span style={{ color: '#86efac', fontSize: '12px' }}>Breathe</span>
+          <Wind size={16} color="#fff" />
+          <span style={{ color: '#fff', fontSize: '12px' }}>Breathe</span>
         </button>
       </div>
 
@@ -196,23 +128,15 @@ export function EcosystemScreen() {
       <div
         className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-2.5 rounded-2xl"
         style={{
-          background: 'rgba(6,14,10,0.75)', backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(74,222,128,0.15)',
+          background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.15)',
         }}
       >
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80' }} />
-        <span style={{ color: '#86efac', fontSize: '12px', letterSpacing: '0.05em' }}>
+        <span style={{ color: '#fff', fontSize: '12px', letterSpacing: '0.05em' }}>
           Day 47 · Tap an element to begin
         </span>
       </div>
-
-      {/* Ambient light animation styles */}
-      <style>{`
-        @keyframes ecosystemGlow {
-          0%, 100% { opacity: 0.55; }
-          50% { opacity: 0.8; }
-        }
-      `}</style>
     </motion.div>
   );
 }
