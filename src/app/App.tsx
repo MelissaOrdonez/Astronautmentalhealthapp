@@ -10,7 +10,7 @@ export default function App() {
         style={{ background: '#020208', height: '100dvh', overflow: 'hidden' }}
       >
         <div
-          className="w-full max-w-sm relative"
+          className="w-full relative"
           style={{ height: '100dvh', overflow: 'hidden' }}
         >
           <RouterProvider router={router} />
