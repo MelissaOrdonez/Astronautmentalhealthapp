@@ -2,6 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 
+type Sound = {
+  label: 'Rainfall' | 'Forest' | 'Ocean' | 'Jungle';
+  icon: string;
+};
+
+const sounds: Record<Sound['label'], string> = {
+  Forest: '/sounds/bird.mp3',
+  Rainfall: '/sounds/rain.mp3',
+  Ocean: '/sounds/ocean.mp3',
+  Jungle: '/sounds/jungle.mp3',
+};
+
 type BreathPhase = 'idle' | 'in' | 'hold-in' | 'out' | 'hold-out';
 
 interface PhaseConfig {
@@ -28,6 +40,32 @@ export function MeditationScreen() {
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentPhase = PHASES[phaseIdx];
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const soundList: Sound[] = [
+    { label: 'Rainfall', icon: '🌧️' },
+    { label: 'Forest', icon: '🌳' },
+    { label: 'Ocean', icon: '🌊' },
+    { label: 'Jungle', icon: '🐒' },
+  ];
+
+  const [active, setActive] = useState<Sound['label'] | null>(soundList[0].label);
+  useEffect(() => {
+    if (!audioRef.current) return;          
+    audioRef.current.src = sounds[soundList[0].label];  
+    audioRef.current.loop = true;           
+    audioRef.current.play();                
+  }, []);                                   
+  const playSound = (label: Sound['label']) => {
+    if (!audioRef.current) return;
+
+    if (active === label) return; 
+
+    audioRef.current.src = sounds[label];
+    audioRef.current.loop = true;
+    audioRef.current.play();
+
+    setActive(label);
+  };
 
   useEffect(() => {
     if (!started) return;
@@ -84,37 +122,6 @@ export function MeditationScreen() {
         height: '100dvh',
       }}
     >
-      {/* Forest background elements */}
-      <svg
-        viewBox="0 0 390 780"
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        preserveAspectRatio="xMidYMid slice"
-        style={{ opacity: 0.6 }}
-      >
-        {/* Faint stars */}
-        {[[30,45],[90,30],[160,55],[230,35],[290,50],[350,40],[65,80],[180,75],[310,68]].map(([x,y],i) => (
-          <circle key={i} cx={x} cy={y} r="0.8" fill="rgba(200,240,200,0.3)" />
-        ))}
-        {/* Moon */}
-        <circle cx="300" cy="70" r="32" fill="rgba(180,220,195,0.08)" />
-        <circle cx="300" cy="70" r="18" fill="rgba(180,220,195,0.06)" />
-        {/* Mountains */}
-        <path d="M0,340 L70,240 L130,275 L185,225 L245,258 L295,218 L350,248 L390,232 L390,780 L0,780 Z" fill="rgba(10,22,12,0.8)" />
-        <path d="M0,390 L80,295 L145,325 L200,280 L260,310 L320,280 L390,300 L390,780 L0,780 Z" fill="rgba(8,18,9,0.9)" />
-        {/* Trees */}
-        {[[20,360],[50,350],[330,345],[360,355],[375,340]].map(([x,y],i) => (
-          <g key={i}>
-            <polygon points={`${x-20},${y} ${x},${y-50} ${x+20},${y}`} fill="rgba(8,22,8,0.9)" />
-            <polygon points={`${x-17},${y-15} ${x},${y-60} ${x+17},${y-15}`} fill="rgba(10,26,10,0.9)" />
-          </g>
-        ))}
-        {/* Ground */}
-        <path d="M0,440 Q100,428 200,438 Q300,448 390,435 L390,780 L0,780 Z" fill="rgba(7,14,8,0.95)" />
-        {/* Soft fireflies */}
-        {[[120,420],[170,400],[240,415],[290,408]].map(([x,y],i) => (
-          <circle key={`ff-${i}`} cx={x} cy={y} r="2" fill="#86efac" opacity="0.3" style={{filter:'blur(1px)'}} />
-        ))}
-      </svg>
 
       {/* Top: back button */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 pt-5 z-30">
@@ -133,6 +140,48 @@ export function MeditationScreen() {
             <span style={{ color: '#4ade80', fontSize: '12px' }}>🔄 {cycles}</span>
           </div>
         )}
+      </div>
+
+      <div className="absolute top-40 left-0 right-0 flex items-center justify-between px-5 pt-5 z-30">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.3, duration: 0.7 }}
+          className="mt-12 flex flex-col gap-3"
+        >
+          <motion.h2
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.7 }}
+            className="text-lg font-semibold text-blue-200"
+          >
+          <p style={{ color: '#4ade80', letterSpacing: '0.1em', margin: '0 0 6px' }}>Explore Different Sounds </p>
+          </motion.h2>
+          <audio ref={audioRef} />
+
+          {soundList.map(({ label, icon }) => {
+            const isActive = active === label;
+
+            return (
+              <motion.button
+                key={label}
+                onClick={() => playSound(label)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md transition
+                  ${isActive
+                    ? 'bg-green-400/20 ring-1 ring-green-300 text-green-200'
+                    : 'hover:bg-gray-200/10 text-gray-100/70'}
+                `}
+              >
+                <span style={{ fontSize: 20 }}>{icon}</span>
+                <span style={{ fontSize: '10px', letterSpacing: '0.04em' }}>
+                  {label}
+                </span>
+              </motion.button>
+            );
+          })}
+        </motion.div>   
       </div>
 
       {/* Main content */}
