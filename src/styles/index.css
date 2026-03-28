@@ -1,0 +1,34 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Global resets for mobile app feel */
+* {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+html, body {
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+button {
+  -webkit-touch-callout: none;
+}
+
+/* Smooth scrolling inside panels */
+.scroll-panel {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.scroll-panel::-webkit-scrollbar {
+  display: none;
+}
