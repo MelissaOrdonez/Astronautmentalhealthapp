@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { NatureLayout } from '../NatureLayout';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 type StoneDef   = { w: number; h: number; rx: number; label: string; mass: number };
 type Stone      = StoneDef & { id: number; colorIdx: number };
 type PlacedStone = Stone & { cx: number; cy: number };
-type Phase      = 'instructions' | 'pick' | 'drag' | 'shake' | 'end' | 'result';
+type Phase = 'instructions' | 'pick' | 'drag' | 'shake' | 'end' | 'result' | 'history';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const TARGET_H          = 180;
+const TARGET_H          = 400;
 const GROUND_Y          = 460;   // moved up to give pile more room
 const PILE_X            = 80;    // wider from edge so stones are fully visible
 const PILE_SPACING      = 58;    // vertical gap between pile stones
@@ -32,11 +33,15 @@ const STONE_COLORS = ['#38bdf8','#0ea5e9','#22d3ee','#7dd3fc','#38bdf8','#0ea5e9
 
 // ─── Pure helpers ──────────────────────────────────────────────────────────────
 
-function makeStones(): Stone[] {
-  return [...STONE_DEFS]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 5)
-    .map((d, i) => ({ ...d, id: i, colorIdx: i }));
+function makeStones(count = 10): Stone[] {
+  return Array.from({ length: count }, (_, i) => {
+    const d = STONE_DEFS[Math.floor(Math.random() * STONE_DEFS.length)];
+    return {
+      ...d,
+      id: i,
+      colorIdx: i % STONE_COLORS.length,
+    };
+  });
 }
 
 function pileY(i: number): number {
@@ -49,17 +54,95 @@ function getStackHeight(stack: PlacedStone[]): number {
 }
 
 function computeBalance(stack: PlacedStone[]) {
-  if (stack.length === 0) return { ok: true, drift: 0, com: STACK_CENTER };
-  let totalMass = 0, weightedX = 0;
-  for (const st of stack) { totalMass += st.mass; weightedX += st.cx * st.mass; }
+  if (stack.length === 0) {
+    return { ok: true, drift: 0, com: STACK_CENTER, baseCenter: STACK_CENTER };
+  }
+
+  let totalMass = 0;
+  let weightedX = 0;
+
+  for (const st of stack) {
+    totalMass += st.mass;
+    weightedX += st.cx * st.mass;
+  }
+
   const com = weightedX / totalMass;
-  return { ok: Math.abs(com - STACK_CENTER) < BALANCE_TOLERANCE, drift: com - STACK_CENTER, com };
+
+  const baseStone = stack[0];
+  const baseCenter = baseStone.cx;
+  const allowedDrift = Math.min(BALANCE_TOLERANCE, baseStone.w * 0.35);
+  const drift = com - baseCenter;
+
+  return {
+    ok: Math.abs(drift) < allowedDrift,
+    drift,
+    com,
+    baseCenter,
+  };
+}
+
+function isGettingUnbalanced(stack: PlacedStone[]) {
+  const bal = computeBalance(stack);
+  return bal.ok && Math.abs(bal.drift) > BALANCE_TOLERANCE * 0.35;
 }
 
 function hitTest(mx: number, my: number, cx: number, cy: number, w: number, h: number): boolean {
   return Math.abs(mx - cx) <= w / 2 + HIT_PAD && Math.abs(my - cy) <= h / 2 + HIT_PAD;
 }
 
+function clampDropX(stone: Stone, proposedX: number) {
+  const zL = STACK_CENTER - 105;
+  const zR = STACK_CENTER + 105;
+
+  const minZoneX = zL + stone.w / 2;
+  const maxZoneX = zR - stone.w / 2;
+
+  return Math.max(minZoneX, Math.min(maxZoneX, proposedX));
+}
+
+function isSupported(stack: PlacedStone[]) {
+  if (stack.length <= 1) return true;
+
+  const top = stack[stack.length - 1];
+  const below = stack[stack.length - 2];
+
+  const topLeft = top.cx - top.w / 2;
+  const topRight = top.cx + top.w / 2;
+
+  const belowLeft = below.cx - below.w / 2;
+  const belowRight = below.cx + below.w / 2;
+
+  // check horizontal overlap
+  const overlap = Math.min(topRight, belowRight) - Math.max(topLeft, belowLeft);
+
+  return overlap > 5; // require at least small overlap
+}
+
+const STORAGE_KEY = 'stone_stack_sessions';
+
+type SessionResult = {
+  score: number;
+  height: number;
+  won: boolean;
+  timestamp: number;
+};
+
+function loadSessions(): SessionResult[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessions(sessions: SessionResult[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.slice(-30)));
+  } catch {
+    // ignore storage errors
+  }
+}
 // ─── Canvas drawing ────────────────────────────────────────────────────────────
 
 function drawStone(
@@ -79,7 +162,7 @@ function drawStone(
   }
   ctx.fillStyle = color;
   ctx.beginPath();
-  (ctx as any).roundRect(x - w / 2, y - h / 2, w, h, rx);
+  ctx.rect(x - w / 2, y - h / 2, w, h);
   ctx.fill();
   ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   // rim highlight
@@ -115,17 +198,26 @@ export function FocusGame() {
   const phaseRef   = useRef<Phase>('instructions');
   const stonesRef  = useRef<Stone[]>([]);
   const stackRef   = useRef<PlacedStone[]>([]);
-  const dragRef    = useRef<{ stone: Stone; mx: number; my: number } | null>(null);
+  const selectedStoneRef = useRef<Stone | null>(null);
   const shakeRef   = useRef<{ t: number } | null>(null);
   const hoverRef   = useRef<number>(-1);
+  const fallingStoneRef = useRef<{
+    stone: Stone;
+    x: number;
+    y: number;
+    targetY: number;
+    vy: number;
+  } | null>(null);
 
   const [phase, setPhase]             = useState<Phase>('instructions');
   const [sessions, setSessions]       = useState(0);
   const [totalScore, setTotalScore]   = useState(0);
   const [bestScore, setBestScore]     = useState<number | null>(null);
-  const [hintText, setHintText]       = useState('Drag a stone onto the stack');
+  const [hintText, setHintText]       = useState('Click a stone to select it');
   const [heightText, setHeightText]   = useState(`0 / ${TARGET_H}px`);
   const [result, setResult]           = useState<{ win: boolean; score: number; reason: string } | null>(null);
+  const [warningText, setWarningText] = useState('');
+  const [allSessions, setAllSessions] = useState<SessionResult[]>(loadSessions);
 
   // ── Key fix: canvas coordinate conversion accounting for CSS scaling ─────────
   const toCanvas = useCallback((clientX: number, clientY: number) => {
@@ -174,13 +266,105 @@ export function FocusGame() {
     ctx.beginPath(); ctx.moveTo(0, GROUND_Y + 2); ctx.lineTo(CANVAS_W, GROUND_Y + 2); ctx.stroke();
 
     // Pile zone — subtle background panel
+    const pileTopY =
+      stonesRef.current.length > 0
+        ? Math.max(20, pileY(stonesRef.current.length - 1) - 36)
+        : 60;
+
     ctx.fillStyle = 'rgba(56,189,248,0.04)';
     ctx.beginPath();
-    (ctx as any).roundRect(10, 60, 140, GROUND_Y - 64, 10);
+    ctx.rect(10, pileTopY, 140, GROUND_Y + 2 - pileTopY);
     ctx.fill();
     ctx.strokeStyle = 'rgba(56,189,248,0.1)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
+
+    // ── Falling stone ──
+    if (fallingStoneRef.current) {
+      const falling = fallingStoneRef.current;
+      const col = STONE_COLORS[falling.stone.colorIdx % STONE_COLORS.length];
+
+      falling.vy += 0.9;
+      falling.y += falling.vy;
+
+      if (falling.y >= falling.targetY) {
+        falling.y = falling.targetY;
+
+        const placed: PlacedStone = {
+          ...falling.stone,
+          cx: falling.x,
+          cy: falling.targetY,
+        };
+
+        stackRef.current = [...stackRef.current, placed];
+        fallingStoneRef.current = null;
+        
+        // 🚨 SUPPORT CHECK (NEW)
+        if (!isSupported(stackRef.current)) {
+          setWarningText('');
+          phaseRef.current = 'shake';
+          setPhase('shake');
+          shakeRef.current = { t: 0 };
+          setTimeout(() => finishGame('topple'), 900);
+          return;
+        }
+
+       if (stackRef.current.length === 1) {
+          setWarningText('');
+        } else {
+          const bal = computeBalance(stackRef.current);
+
+          if (!bal.ok) {
+            setWarningText('');
+            phaseRef.current = 'shake';
+            setPhase('shake');
+            shakeRef.current = { t: 0 };
+            setTimeout(() => finishGame('topple'), 900);
+            return;
+          }
+
+          if (isGettingUnbalanced(stackRef.current)) {
+            setWarningText('Getting unbalanced, be careful');
+          } else {
+            setWarningText('');
+          }
+        }
+
+        const newHeight = Math.round(getStackHeight(stackRef.current));
+        setHeightText(`${newHeight} / ${TARGET_H}px`);
+
+        if (newHeight >= TARGET_H) {
+          finishGame('win');
+          return;
+        }
+
+        if (stonesRef.current.length < 3) {
+          const nextIdStart = Math.max(
+            0,
+            ...stackRef.current.map(s => s.id),
+            ...stonesRef.current.map(s => s.id)
+          ) + 1;
+
+          const extraStones = Array.from({ length: 10 }, (_, i) => {
+            const d = STONE_DEFS[Math.floor(Math.random() * STONE_DEFS.length)];
+            return {
+              ...d,
+              id: nextIdStart + i,
+              colorIdx: (nextIdStart + i) % STONE_COLORS.length,
+            };
+          });
+
+          stonesRef.current = [...stonesRef.current, ...extraStones];
+        }
+
+        setHintText('Click a stone to select it');
+      }
+
+      ctx.save();
+      ctx.translate(falling.x, falling.y);
+      drawStone(ctx, 0, 0, falling.stone.w, falling.stone.h, falling.stone.rx, col, 1, true);
+      ctx.restore();
+    }
 
     // Stack zone guides
     const zL = STACK_CENTER - 105, zR = STACK_CENTER + 105;
@@ -201,22 +385,16 @@ export function FocusGame() {
     ctx.textAlign = 'right';
     ctx.fillText('target', zL - 14, targetY + 4);
 
-    // Pile label
-    ctx.fillStyle = 'rgba(125,211,252,0.5)';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('STONES', PILE_X + 10, 76);
-
     // ── Pile stones ──
     stonesRef.current.forEach((s, i) => {
-      if (dragRef.current?.stone.id === s.id) return; // drawn on top while dragging
       const py    = pileY(i);
       const hover = hoverRef.current === i;
+      const selected = selectedStoneRef.current?.id === s.id;
       const col   = STONE_COLORS[s.colorIdx % STONE_COLORS.length];
       ctx.save();
       ctx.translate(PILE_X, py);
       if (hover) { ctx.scale(1.08, 1.08); }
-      drawStone(ctx, 0, 0, s.w, s.h, s.rx, col, 1, hover);
+      drawStone(ctx, 0, 0, s.w, s.h, s.rx, col, 1, selected);
       ctx.restore();
     });
 
@@ -236,29 +414,14 @@ export function FocusGame() {
     if (stackRef.current.length > 1) {
       const bal    = computeBalance(stackRef.current);
       const comY   = GROUND_Y - getStackHeight(stackRef.current) / 2;
-      const danger = Math.abs(bal.drift) > BALANCE_TOLERANCE * 0.65;
+      const unbalanced = Math.abs(bal.drift) > BALANCE_TOLERANCE * 0.35;
       ctx.beginPath();
       ctx.arc(bal.com + sx, comY, 5, 0, Math.PI * 2);
-      ctx.fillStyle   = danger ? '#f87171' : '#4ade80';
-      ctx.shadowColor = danger ? '#f87171' : '#4ade80';
+      ctx.fillStyle   = unbalanced ? '#f87171' : '#4ade80';
+      ctx.shadowColor = unbalanced ? '#f87171' : '#4ade80';
       ctx.shadowBlur  = 10;
       ctx.fill();
       ctx.shadowBlur  = 0;
-    }
-
-    // ── Drag: ghost + floating stone ──
-    if (dragRef.current) {
-      const { stone, mx, my } = dragRef.current;
-      const col      = STONE_COLORS[stone.colorIdx % STONE_COLORS.length];
-      const overStack = mx >= zL && mx <= zR;
-
-      if (overStack) {
-        const ghostY = GROUND_Y - getStackHeight(stackRef.current) - stone.h / 2 - 2;
-        const clampedX = Math.max(zL + stone.w / 2, Math.min(zR - stone.w / 2, mx));
-        drawStone(ctx, clampedX, ghostY, stone.w, stone.h, stone.rx, col, 0.28);
-      }
-      // stone follows cursor
-      drawStone(ctx, mx, my, stone.w, stone.h, stone.rx, col, 0.93, true);
     }
 
     if (phaseRef.current !== 'end') {
@@ -272,12 +435,14 @@ export function FocusGame() {
     cancelAnimationFrame(animRef.current);
     stonesRef.current  = makeStones();
     stackRef.current   = [];
-    dragRef.current    = null;
+    fallingStoneRef.current = null;
+    selectedStoneRef.current = null;
     shakeRef.current   = null;
     hoverRef.current   = -1;
     phaseRef.current   = 'pick';
     setPhase('pick');
-    setHintText('Drag a stone onto the stack');
+    setHintText('Click a stone to select it');
+    setWarningText('');
     setHeightText(`0 / ${TARGET_H}px`);
     animRef.current = requestAnimationFrame(loop);
   }, [loop]);
@@ -285,133 +450,179 @@ export function FocusGame() {
   // ── Finish game ────────────────────────────────────────────────────────────
 
   const finishGame = useCallback((reason: 'topple' | 'win' | 'out') => {
-    const stackH = getStackHeight(stackRef.current);
-    const score  = Math.min(100, Math.round((stackH / TARGET_H) * 100));
+  const stackH = getStackHeight(stackRef.current);
+  const score  = Math.min(100, Math.round((stackH / TARGET_H) * 100));
+
+  const session: SessionResult = {
+    score,
+    height: Math.round(stackH),
+    won: reason === 'win',
+    timestamp: Date.now(),
+  };
+
+  setAllSessions(prev => {
+    const updated = [...prev, session];
+    saveSessions(updated);
+    return updated;
+  });
+
+  setSessions(p => p + 1);
+  setTotalScore(p => p + score);
+  setBestScore(p => p === null || score > p ? score : p);
+
+  setResult({
+    win: reason === 'win',
+    score,
+    reason:
+      reason === 'win'
+        ? `Stacked ${Math.round(stackH)}px — target reached!`
+        : reason === 'topple'
+        ? `Center of mass drifted too far — collapsed at ${Math.round(stackH)}px.`
+        : `No stones left — reached ${Math.round(stackH)}px of ${TARGET_H}px.`,
+  });
+
+  if (reason === 'topple') {
+    phaseRef.current = 'result';
+    setPhase('result');
+  } else {
     phaseRef.current = 'end';
     setPhase('end');
-    setSessions(p => p + 1);
-    setTotalScore(p => p + score);
-    setBestScore(p => p === null || score > p ? score : p);
-    setResult({
-      win: reason === 'win',
-      score,
-      reason:
-        reason === 'win'    ? `Stacked ${Math.round(stackH)}px — target reached!` :
-        reason === 'topple' ? `Center of mass drifted too far — collapsed at ${Math.round(stackH)}px.` :
-                              `No stones left — reached ${Math.round(stackH)}px of ${TARGET_H}px.`,
-    });
-    setTimeout(() => setPhase('result'), reason === 'topple' ? 900 : 250);
-  }, []);
+    setTimeout(() => {
+      phaseRef.current = 'result';
+      setPhase('result');
+    }, 250);
+  }
+}, []);
 
   // ── Pointer events ─────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+useEffect(() => {
+  const canvas = canvasRef.current;
+  if (!canvas) return;
 
-    const onDown = (e: PointerEvent) => {
-      e.preventDefault();
-      if (phaseRef.current !== 'pick') return;
-      const { x, y } = toCanvas(e.clientX, e.clientY);
+  const onDown = (e: MouseEvent | TouchEvent) => {
+    e.preventDefault();
+    if (phaseRef.current !== 'pick' || fallingStoneRef.current) return;
 
-      // Find which pile stone was hit — check top stone first
+    const clientX = e.type.startsWith('touch')
+      ? (e as TouchEvent).touches[0].clientX
+      : (e as MouseEvent).clientX;
+
+    const clientY = e.type.startsWith('touch')
+      ? (e as TouchEvent).touches[0].clientY
+      : (e as MouseEvent).clientY;
+
+    const { x, y } = toCanvas(clientX, clientY);
+
+    if (selectedStoneRef.current) {
+      const zL = STACK_CENTER - 105, zR = STACK_CENTER + 105;
+      if (x >= zL && x <= zR) {
+        const stone = selectedStoneRef.current;
+        const dropX = clampDropX(stone, x);
+        const stackH = getStackHeight(stackRef.current);
+        const targetY = GROUND_Y - stackH - stone.h / 2 - 2;
+
+        stonesRef.current = stonesRef.current.filter(s => s.id !== stone.id);
+        selectedStoneRef.current = null;
+        setHintText('Stone dropped');
+        setWarningText('');
+
+        fallingStoneRef.current = {
+          stone,
+          x: dropX,
+          y: y,
+          targetY,
+          vy: 0,
+        };
+      } else {
+        selectedStoneRef.current = null;
+        setHintText('Click a stone to select it');
+      }
+    } else {
       for (let i = stonesRef.current.length - 1; i >= 0; i--) {
-        const s  = stonesRef.current[i];
+        const s = stonesRef.current[i];
         const py = pileY(i);
         if (hitTest(x, y, PILE_X, py, s.w, s.h)) {
-          dragRef.current  = { stone: s, mx: x, my: y };
-          phaseRef.current = 'drag';
-          setPhase('drag');
-          setHintText(`Dragging: ${s.label} — drop onto the stack zone`);
-          canvas.setPointerCapture(e.pointerId);
+          selectedStoneRef.current = s;
+          setHintText(`Selected: ${s.label} — click in the stack zone to place`);
           return;
         }
       }
-    };
+    }
+  };
 
-    const onMove = (e: PointerEvent) => {
-      e.preventDefault();
-      const { x, y } = toCanvas(e.clientX, e.clientY);
+  const onMove = (e: MouseEvent | TouchEvent) => {
+    e.preventDefault();
+    const clientX = e.type.startsWith('touch')
+      ? (e as TouchEvent).touches[0].clientX
+      : (e as MouseEvent).clientX;
 
-      if (phaseRef.current === 'pick') {
-        hoverRef.current = -1;
-        for (let i = 0; i < stonesRef.current.length; i++) {
-          const s  = stonesRef.current[i];
-          const py = pileY(i);
-          if (hitTest(x, y, PILE_X, py, s.w, s.h)) { hoverRef.current = i; break; }
+    const clientY = e.type.startsWith('touch')
+      ? (e as TouchEvent).touches[0].clientY
+      : (e as MouseEvent).clientY;
+
+    const { x, y } = toCanvas(clientX, clientY);
+
+    if (phaseRef.current === 'pick') {
+      hoverRef.current = -1;
+      for (let i = 0; i < stonesRef.current.length; i++) {
+        const s = stonesRef.current[i];
+        const py = pileY(i);
+        if (hitTest(x, y, PILE_X, py, s.w, s.h)) {
+          hoverRef.current = i;
+          break;
         }
-        return;
       }
+    }
+  };
 
-      if (phaseRef.current === 'drag' && dragRef.current) {
-        dragRef.current = { ...dragRef.current, mx: x, my: y };
-      }
-    };
+  canvas.addEventListener('mousedown', onDown, { passive: false });
+  canvas.addEventListener('mousemove', onMove, { passive: false });
+  canvas.addEventListener('touchstart', onDown, { passive: false });
+  canvas.addEventListener('touchmove', onMove, { passive: false });
 
-    const onUp = (e: PointerEvent) => {
-      e.preventDefault();
-      if (phaseRef.current !== 'drag' || !dragRef.current) return;
-
-      const { stone, mx } = dragRef.current;
-      const zL = STACK_CENTER - 105, zR = STACK_CENTER + 105;
-      dragRef.current = null;
-
-      if (mx >= zL && mx <= zR) {
-        const clampedX = Math.max(zL + stone.w / 2, Math.min(zR - stone.w / 2, mx));
-        const stackH   = getStackHeight(stackRef.current);
-        const cy       = GROUND_Y - stackH - stone.h / 2 - 2; // align on top of stack
-        const placed: PlacedStone = { ...stone, cx: clampedX, cy };
-
-        stackRef.current = [...stackRef.current, placed];
-        stonesRef.current = stonesRef.current.filter(s => s.id !== stone.id);
-
-        setHeightText(`${Math.round(stackH + stone.h)} / ${TARGET_H}px`);
-
-        const bal = computeBalance(stackRef.current);
-        if (!bal.ok) {
-          phaseRef.current = 'shake';
-          setPhase('shake');
-          shakeRef.current = { t: 0 };
-          setTimeout(() => finishGame('topple'), 900);
-          return;
-        }
-        if (stackH + stone.h >= TARGET_H) { finishGame('win'); return; }
-        if (stonesRef.current.length === 0) { finishGame('out'); return; }
-      }
-      // whether dropped on stack or not, return to pick
-      phaseRef.current = 'pick';
-      setPhase('pick');
-      setHintText('Drag a stone onto the stack');
-    };
-
-    canvas.addEventListener('pointerdown',  onDown,  { passive: false });
-    canvas.addEventListener('pointermove',  onMove,  { passive: false });
-    canvas.addEventListener('pointerup',    onUp,    { passive: false });
-    canvas.addEventListener('pointercancel', onUp,   { passive: false });
-    canvas.addEventListener('pointerleave', () => { if (phaseRef.current === 'pick') hoverRef.current = -1; });
-
-    return () => {
-      canvas.removeEventListener('pointerdown',  onDown);
-      canvas.removeEventListener('pointermove',  onMove);
-      canvas.removeEventListener('pointerup',    onUp);
-      canvas.removeEventListener('pointercancel', onUp);
-    };
-  }, [toCanvas, finishGame]);
+  return () => {
+    canvas.removeEventListener('mousedown', onDown);
+    canvas.removeEventListener('mousemove', onMove);
+    canvas.removeEventListener('touchstart', onDown);
+    canvas.removeEventListener('touchmove', onMove);
+  };
+}, [phase, toCanvas, finishGame]);
 
   useEffect(() => () => cancelAnimationFrame(animRef.current), []);
 
-  const avgScore = sessions > 0 ? Math.round(totalScore / sessions) : null;
-  const fmt      = (v: number | null) => v === null ? '—' : `${v}%`;
+  const persistedSessions = allSessions.length;
+  const persistedAvgScore =
+    allSessions.length > 0
+      ? Math.round(allSessions.reduce((sum, s) => sum + s.score, 0) / allSessions.length)
+      : null;
+  const persistedBestScore =
+    allSessions.length > 0
+      ? Math.max(...allSessions.map(s => s.score))
+      : null;
 
+  const fmt = (v: number | null) => v === null ? '—' : `${v}%`;
+
+  const bestHeight = allSessions.length > 0 ? Math.max(...allSessions.map(s => s.height)) : 0;
+  const avgHistoryScore =
+    allSessions.length > 0
+      ? Math.round(allSessions.reduce((sum, s) => sum + s.score, 0) / allSessions.length)
+      : 0;
+  const wins = allSessions.filter(s => s.won).length;
   // ─────────────────────────────────────────────────────────────────────────────
   return (
+  <NatureLayout showBack={true} backTo="/ecosystem">
     <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(180deg, #061a2a 0%, #0a2840 50%, #061a28 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       padding: '2rem 1rem 2.5rem',
       fontFamily: "'Georgia', 'Palatino', serif",
       color: '#e0f2fe',
+      width: '100%',
+      minHeight: '100%',
+      overflowY: 'auto',
+      boxSizing: 'border-box',
     }}>
 
       {/* ── Instructions ────────────────────────────────────────────────────── */}
@@ -437,7 +648,7 @@ export function FocusGame() {
           <div style={{ width: 64, height: 1.5, background: 'linear-gradient(90deg, transparent, #38bdf8, transparent)', margin: '14px auto 22px' }} />
 
           <p style={{ fontSize: 15, lineHeight: 1.75, textAlign: 'center', color: 'rgba(224,242,254,0.75)', marginBottom: 12 }}>
-            A mindful stacking game. Drag irregular river stones and build your tower one by one — reaching the glowing green target line.
+            A mindful stacking game. Select irregular river stones and place them one by one — reaching the glowing green target line.
           </p>
           <p style={{ fontSize: 13, lineHeight: 1.7, textAlign: 'center', color: 'rgba(224,242,254,0.5)', marginBottom: 24, fontFamily: 'sans-serif' }}>
             Every stone has a different shape and weight. Stack them off-center and the tower will sway, then fall. A glowing dot tracks your center of mass —{' '}
@@ -447,8 +658,8 @@ export function FocusGame() {
 
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 26 }}>
             {[
-              ['①', 'Drag a stone from the left panel'],
-              ['②', 'Drop it into the dashed stack zone'],
+              ['①', 'Click a stone to select it'],
+              ['②', 'Click in the dashed stack zone to place it'],
               ['③', 'Watch the balance dot — stay green'],
               ['④', 'Reach the green line to win'],
             ].map(([n, t]) => (
@@ -460,9 +671,9 @@ export function FocusGame() {
           </div>
 
           <div style={{ display: 'flex', gap: 10, width: '100%', marginBottom: 26 }}>
-            <StatBox label="best"     value={fmt(bestScore)} />
-            <StatBox label="average"  value={fmt(avgScore)}  />
-            <StatBox label="sessions" value={String(sessions)} />
+            <StatBox label="best"     value={fmt(persistedBestScore)} />
+            <StatBox label="average"  value={fmt(persistedAvgScore)} />
+            <StatBox label="sessions" value={String(persistedSessions)} />
           </div>
 
           <button onClick={startGame} style={{
@@ -494,11 +705,168 @@ export function FocusGame() {
               borderRadius: 16,
               border: '1px solid rgba(56,189,248,0.2)',
               boxShadow: '0 0 40px rgba(56,189,248,0.08)',
-              cursor: phase === 'drag' ? 'grabbing' : 'grab',
+              cursor: 'pointer',
               touchAction: 'none',
               userSelect: 'none',
             }}
           />
+          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+            <button
+              onClick={() => setPhase('instructions')}
+              style={{
+                flex: 1,
+                padding: '12px 0',
+                borderRadius: 14,
+                background: 'rgba(56,189,248,0.08)',
+                border: '1px solid rgba(56,189,248,0.2)',
+                color: '#7dd3fc',
+                fontSize: 14,
+                fontFamily: 'sans-serif',
+                cursor: 'pointer',
+              }}
+            >
+              Back to menu
+            </button>
+
+            <button
+              onClick={() => setPhase('history')}
+              style={{
+                flex: 1,
+                padding: '12px 0',
+                borderRadius: 14,
+                background: 'rgba(14,165,233,0.12)',
+                border: '1px solid rgba(56,189,248,0.25)',
+                color: '#bae6fd',
+                fontSize: 14,
+                fontFamily: 'sans-serif',
+                cursor: 'pointer',
+              }}
+            >
+              Performance history
+            </button>
+          </div>
+          {warningText && (
+            <div style={{
+              marginBottom: 10,
+              padding: '8px 12px',
+              borderRadius: 12,
+              background: 'rgba(248,113,113,0.12)',
+              border: '1px solid rgba(248,113,113,0.28)',
+              color: '#fca5a5',
+              fontSize: 13,
+              fontFamily: 'sans-serif',
+              textAlign: 'center',
+            }}>
+              {warningText}
+            </div>
+          )}
+
+        </div>
+      )}
+      {phase === 'history' && (
+        <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column' }}>
+          <p style={{ fontSize: 11, letterSpacing: '0.14em', color: '#38bdf8', marginBottom: 8, fontFamily: 'sans-serif', textAlign: 'center' }}>
+            PERFORMANCE HISTORY
+          </p>
+
+          <h1 style={{ fontSize: 28, fontWeight: 400, margin: '0 0 16px', color: '#e0f2fe', textAlign: 'center' }}>
+            Stone Stack Stats
+          </h1>
+
+          <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+            <StatBox label="sessions" value={String(allSessions.length)} />
+            <StatBox label="avg score" value={`${avgHistoryScore}%`} />
+            <StatBox label="best height" value={`${bestHeight}px`} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+            <StatBox label="wins" value={String(wins)} />
+            <StatBox label="best" value={fmt(persistedBestScore)} />
+            <StatBox label="current avg" value={fmt(persistedAvgScore)} />
+          </div>
+
+          <div style={{
+            background: 'rgba(56,189,248,0.05)',
+            border: '1px solid rgba(56,189,248,0.14)',
+            borderRadius: 16,
+            padding: 12,
+            marginBottom: 18,
+            maxHeight: 260,
+            overflowY: 'auto',
+          }}>
+            {allSessions.length === 0 ? (
+              <p style={{ color: 'rgba(224,242,254,0.5)', fontSize: 13, textAlign: 'center', margin: 8 }}>
+                No sessions yet
+              </p>
+            ) : (
+              allSessions.slice().reverse().map((session, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 8px',
+                    borderBottom: i === allSessions.length - 1 ? 'none' : '1px solid rgba(56,189,248,0.08)',
+                  }}
+                >
+                  <div>
+                    <div style={{ color: '#e0f2fe', fontSize: 13, fontFamily: 'sans-serif' }}>
+                      {session.won ? 'Win' : 'Ended early/collapsed'}
+                    </div>
+                    <div style={{ color: 'rgba(224,242,254,0.45)', fontSize: 11, fontFamily: 'sans-serif' }}>
+                      {new Date(session.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ color: '#38bdf8', fontSize: 13, fontFamily: 'sans-serif' }}>
+                      {session.score}%
+                    </div>
+                    <div style={{ color: 'rgba(224,242,254,0.45)', fontSize: 11, fontFamily: 'sans-serif' }}>
+                      {session.height}px
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={startGame}
+              style={{
+                flex: 1,
+                padding: '12px 0',
+                borderRadius: 14,
+                background: 'rgba(56,189,248,0.08)',
+                border: '1px solid rgba(56,189,248,0.2)',
+                color: '#7dd3fc',
+                fontSize: 14,
+                fontFamily: 'sans-serif',
+                cursor: 'pointer',
+              }}
+            >
+              Start new game
+            </button>
+
+            <button
+              onClick={() => setPhase('instructions')}
+              style={{
+                flex: 1,
+                padding: '12px 0',
+                borderRadius: 14,
+                background: 'transparent',
+                border: '1px solid rgba(56,189,248,0.2)',
+                color: 'rgba(125,211,252,0.75)',
+                fontSize: 14,
+                fontFamily: 'sans-serif',
+                cursor: 'pointer',
+              }}
+            >
+              Menu
+            </button>
+          </div>
         </div>
       )}
 
@@ -519,28 +887,58 @@ export function FocusGame() {
             {result.reason}
           </p>
           <div style={{ display: 'flex', gap: 10, width: '100%', marginBottom: 24 }}>
-            <StatBox label="best"     value={fmt(bestScore)} />
-            <StatBox label="average"  value={fmt(avgScore)}  />
-            <StatBox label="sessions" value={String(sessions)} />
+            <StatBox label="best"     value={fmt(persistedBestScore)} />
+            <StatBox label="average"  value={fmt(persistedAvgScore)} />
+            <StatBox label="sessions" value={String(persistedSessions)} />
           </div>
-          <button onClick={startGame} style={{
-            width: '100%', padding: '14px 0', borderRadius: 18, marginBottom: 10,
-            background: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%)',
-            border: '1px solid rgba(56,189,248,0.3)',
-            color: '#e0f2fe', fontSize: 16, fontFamily: 'sans-serif', fontWeight: 500,
-            cursor: 'pointer', boxShadow: '0 0 28px rgba(56,189,248,0.15)',
-          }}>
-            Try Again
-          </button>
-          <button onClick={() => setPhase('instructions')} style={{
-            width: '100%', padding: '12px 0', borderRadius: 18,
-            background: 'transparent', border: '1px solid rgba(56,189,248,0.2)',
-            color: 'rgba(125,211,252,0.7)', fontSize: 15, fontFamily: 'sans-serif', cursor: 'pointer',
-          }}>
-            Back to menu
-          </button>
+        <button onClick={startGame} style={{
+          width: '100%',
+          padding: '14px 0',
+          borderRadius: 18,
+          marginBottom: 10,
+          background: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%)',
+          border: '1px solid rgba(56,189,248,0.3)',
+          color: '#e0f2fe',
+          fontSize: 16,
+          fontFamily: 'sans-serif',
+          fontWeight: 500,
+          cursor: 'pointer',
+          boxShadow: '0 0 28px rgba(56,189,248,0.15)',
+        }}>
+          Try Again
+        </button>
+
+        <button onClick={() => setPhase('history')} style={{
+          width: '100%',
+          padding: '12px 0',
+          borderRadius: 18,
+          marginBottom: 10,
+          background: 'rgba(14,165,233,0.12)',
+          border: '1px solid rgba(56,189,248,0.25)',
+          color: '#bae6fd',
+          fontSize: 15,
+          fontFamily: 'sans-serif',
+          cursor: 'pointer',
+        }}>
+          Performance history
+        </button>
+
+        <button onClick={() => setPhase('instructions')} style={{
+          width: '100%',
+          padding: '12px 0',
+          borderRadius: 18,
+          background: 'transparent',
+          border: '1px solid rgba(56,189,248,0.2)',
+          color: 'rgba(125,211,252,0.7)',
+          fontSize: 15,
+          fontFamily: 'sans-serif',
+          cursor: 'pointer',
+        }}>
+          Back to menu
+        </button>
         </div>
       )}
     </div>
+    </NatureLayout>
   );
 }
