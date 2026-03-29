@@ -4,14 +4,64 @@ import { motion, AnimatePresence } from 'motion/react';
 import { NatureLayout } from '../NatureLayout';
 import { useGameContext } from '../../context/GameContext';
 
-type Phase = 'instructions' | 'countdown' | 'playing' | 'result';
+type Phase = 'instructions' | 'countdown' | 'playing' | 'result' | 'history';
+
+// helper functions
+interface ReactionSession {
+  score: number;
+  avgMs: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  timestamp: number;
+}
+
+const STORAGE_KEY = 'reaction_sessions';
+
+function loadSessions(): ReactionSession[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessions(sessions: ReactionSession[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.slice(-30)));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function fmtPercent(v: number | null) {
+  return v === null ? '—' : `${v}%`;
+}
+
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        textAlign: 'center',
+        padding: '10px 8px',
+        background: 'rgba(251,146,60,0.06)',
+        border: '1px solid rgba(251,146,60,0.18)',
+        borderRadius: 16
+      }}
+    >
+      <div style={{ fontSize: 17, fontWeight: 500, color: '#fb923c' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,237,213,0.5)', marginTop: 2 }}>{label}</div>
+    </div>
+  );
+}
 
 export interface Animal {
   id: number;
   emoji: string;
   x: number;
   y: number;
-  isTarget: boolean; // true if this is the correct animal to tap
+  isTarget: boolean;
+  appearedAt: number;
 }
 
 const ALL_ANIMALS = [
@@ -27,14 +77,24 @@ const MIN_DISTANCE = 18; // % distance between animals (tweak 15–22)
 export function ReactionGame() {
   const navigate = useNavigate();
   const { saveResult } = useGameContext();
+  const [allSessions, setAllSessions] = useState<ReactionSession[]>(loadSessions);
+  const persistedSessions = allSessions.length;
+  const persistedBestScore =
+    allSessions.length > 0 ? Math.max(...allSessions.map(s => s.score)) : null;
+  const persistedAvgScore =
+    allSessions.length > 0
+      ? Math.round(allSessions.reduce((sum, s) => sum + s.score, 0) / allSessions.length)
+      : null;
 
   // --- GAME STATE ---
-  const appearTimeRef = useRef<number>(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const rtListRef = useRef<number[]>([]);
+  const successfulRtListRef = useRef<number[]>([]);
+  const wrongClicksRef = useRef(0);
+  const missedTargetsRef = useRef(0);
 
   const [phase, setPhase] = useState<Phase>('instructions');
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | null>(null);
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' >('easy');
   const [countdown, setCountdown] = useState(3);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -104,25 +164,28 @@ export function ReactionGame() {
         : ALL_ANIMALS[Math.floor(Math.random() * ALL_ANIMALS.length)];
 
       const newAnimal: Animal = {
-        id: Date.now() + Math.random(), // unique
+        id: Date.now() + Math.random(),
         emoji,
         x: Math.random() * 60 + 10,
         y: Math.random() * 50 + 20,
         isTarget,
+        appearedAt: Date.now(),
       };
-
-      appearTimeRef.current = Date.now();
 
       setAnimals(prev => [...prev, newAnimal]);
 
       // ✅ Always remove after MISS_TIMEOUT
       addTimer(() => {
-        setAnimals(prev => prev.filter(a => a.id !== newAnimal.id));
+        setAnimals(prev => {
+          const stillExists = prev.some(a => a.id === newAnimal.id);
 
-        // Optional: if it's a target and still on screen, count as a miss
-        if (isTarget) {
-          rtListRef.current.push(MISS_TIMEOUT);
-        }
+          if (stillExists && isTarget) {
+            missedTargetsRef.current += 1;
+            rtListRef.current.push(MISS_TIMEOUT);
+          }
+
+          return prev.filter(a => a.id !== newAnimal.id);
+        });
       }, MISS_TIMEOUT);
     };
 
@@ -149,6 +212,7 @@ export function ReactionGame() {
               x: Math.random() * 60 + 10,
               y: Math.random() * 50 + 20,
               isTarget,
+              appearedAt: Date.now(),
             });
           }
           return [...prev, ...newOnes];
@@ -183,23 +247,26 @@ export function ReactionGame() {
 
     setAnimals(prev => prev.filter(a => a.id !== id));
 
-    const rt = Date.now() - appearTimeRef.current;
+    const rt = Date.now() - tapped.appearedAt;
 
     if (tapped.isTarget) {
       hitTargetsRef.current += 1;
       rtListRef.current.push(rt);
+      successfulRtListRef.current.push(rt);
       setLastRT(rt);
     } else {
-      rtListRef.current.push(MISS_TIMEOUT);
+      wrongClicksRef.current += 1;
       setLastRT(null);
     }
 
-    if (rtListRef.current.length > 0) {
+    if (successfulRtListRef.current.length > 0) {
       const avg =
-        rtListRef.current.reduce((a, b) => a + b, 0) /
-        rtListRef.current.length;
+        successfulRtListRef.current.reduce((a, b) => a + b, 0) /
+        successfulRtListRef.current.length;
 
       setAvgRT(Math.round(avg));
+    } else {
+      setAvgRT(0);
     }
 
     setShowFeedback(true);
@@ -215,6 +282,9 @@ export function ReactionGame() {
 
     setCountdown(3);
     rtListRef.current = [];
+    successfulRtListRef.current = [];
+    wrongClicksRef.current = 0;
+    missedTargetsRef.current = 0;
     totalTargetsRef.current = 0;
     hitTargetsRef.current = 0;
     setAnimals([]);
@@ -236,9 +306,23 @@ export function ReactionGame() {
         const total = totalTargetsRef.current;
 
         const accuracy = total > 0 ? Math.round((hits / total) * 100) : 0;
-        const avg = rtListRef.current.length
-          ? Math.round(rtListRef.current.reduce((a, b) => a + b, 0) / rtListRef.current.length)
+        const avg = successfulRtListRef.current.length
+          ? Math.round(
+              successfulRtListRef.current.reduce((a, b) => a + b, 0) /
+              successfulRtListRef.current.length
+            )
           : 0;
+        
+        const newSession: ReactionSession = {
+            score: accuracy,
+            avgMs: avg,
+            difficulty,
+            timestamp: Date.now(),
+          };
+
+        const updatedSessions = [...allSessions, newSession];
+        setAllSessions(updatedSessions);
+        saveSessions(updatedSessions);
 
         const isGood = accuracy > 70;
 
@@ -250,7 +334,7 @@ export function ReactionGame() {
           score: accuracy,
           feedback: isGood ? 'Alertness normal' : 'Reaction slower than baseline',
           timestamp: Date.now(),
-          details: { avgMs: avg },
+          details: { avgMs: avg , difficulty},
         });
 
         setPhase('result');
@@ -336,6 +420,12 @@ export function ReactionGame() {
               ))}
             </div>
 
+            <div style={{ display: 'flex', gap: 10, width: '100%', marginBottom: 26 }}>
+              <StatBox label="best" value={fmtPercent(persistedBestScore)} />
+              <StatBox label="average" value={fmtPercent(persistedAvgScore)} />
+              <StatBox label="sessions" value={String(persistedSessions)} />
+            </div>
+
             <button
               onClick={() => {
                 if (difficulty) setPhase('countdown');
@@ -385,13 +475,70 @@ export function ReactionGame() {
         {phase === 'playing' && (
           <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col flex-1">
             {/* Header */}
-            <div className="flex justify-between px-5 mb-4">
+            <div className="flex justify-between items-center px-5 mb-4">
+              {/* Stop button */}
+              <button onClick={() => {
+                clearTimers();
+
+                const hits = hitTargetsRef.current;
+                const total = totalTargetsRef.current;
+
+                const accuracy = total > 0 ? Math.round((hits / total) * 100) : 0;
+                const avg = successfulRtListRef.current.length
+                  ? Math.round(
+                      successfulRtListRef.current.reduce((a, b) => a + b, 0) /
+                      successfulRtListRef.current.length
+                    )
+                  : 0;
+
+                const good = accuracy > 70;
+
+                setFinalScore(accuracy);
+                setFinalAvg(avg);
+                setIsGood(good);
+
+                saveResult('reaction', {
+                  score: accuracy,
+                  feedback: good ? 'Alertness normal' : 'Reaction slower than baseline',
+                  timestamp: Date.now(),
+                  details: { avgMs: avg, difficulty },
+                });
+
+                setPhase('result');
+              }}
+              className="px-4 py-2 rounded-xl"
+              style={{
+                background: 'rgba(239,68,68,0.15)',
+                border: '1px solid rgba(239,68,68,0.4)',
+                color: '#f87171',
+                fontSize: '13px'
+              }}>
+                Stop & Results
+              </button>
+
+              {/* Difficulty */}
+              <span style={{
+                color: '#fb923c',
+                fontSize: '14px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em'
+              }}>
+                {difficulty}
+              </span>
+
+              {/* Avg RT */}
               <div className="text-right">
                 <span style={{ color: 'rgba(255,237,213,0.5)', fontSize: '12px' }}>Avg RT</span>
-                <p style={{ color: avgRT > 0 && avgRT < 500 ? '#4ade80' : '#fbbf24', fontSize: '22px', margin: 0, fontWeight: 500 }}>
+                <p style={{
+                  color: avgRT > 0 && avgRT < 500 ? '#4ade80' : '#fbbf24',
+                  fontSize: '22px',
+                  margin: 0,
+                  fontWeight: 500
+                }}>
                   {avgRT > 0 ? `${avgRT}ms` : '—'}
                 </p>
               </div>
+
             </div>
 
             {/* Game area */}
@@ -409,14 +556,13 @@ export function ReactionGame() {
                 {showFeedback && lastRT !== null && (
                   <motion.div initial={{ opacity: 0, scale: 0.8, y: '30%' }} animate={{ opacity: 1, scale: 1, y: '25%' }} exit={{ opacity: 0, y: '20%' }} style={{
                     position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-                    background: lastRT < 400 ? 'rgba(74,222,128,0.2)' : 'rgba(251,146,60,0.2)',
-                    border: `1px solid ${lastRT < 400 ? 'rgba(74,222,128,0.5)' : 'rgba(251,146,60,0.5)'}`,
+                    background: lastRT <= 900 ? 'rgba(74,222,128,0.2)' : 'rgba(251,146,60,0.2)',
+                    border: `1px solid ${lastRT <= 900 ? 'rgba(74,222,128,0.5)' : 'rgba(251,146,60,0.5)'}`,
                     borderRadius: 16, padding: '8px 20px',
-                    color: lastRT < 400 ? '#4ade80' : '#fb923c',
+                    color: lastRT <= 900 ? '#4ade80' : '#fb923c',
                     fontSize: '18px', fontWeight: 500, whiteSpace: 'nowrap',
                   }}>
-                    {lastRT}ms {lastRT < 300 ? '⚡' : lastRT < 450 ? '✓' : '↓'}
-                  </motion.div>
+                    {lastRT}ms {lastRT <= 700 ? '⚡' : lastRT <= 900 ? '✓' : '↓'}                  </motion.div>
                 )}
               </AnimatePresence>
 
@@ -514,14 +660,20 @@ export function ReactionGame() {
                         padding: '4px 10px', borderRadius: 20, fontSize: '12px',
                         background:
                           rt === MISS_TIMEOUT ? 'rgba(239,68,68,0.15)' :
-                          rt < 350 ? 'rgba(74,222,128,0.15)' :
-                          rt < 500 ? 'rgba(251,146,60,0.15)' : 'rgba(239,68,68,0.15)',
+                          rt <= 900 ? 'rgba(74,222,128,0.15)' :
+                          rt <= 1300 ? 'rgba(251,146,60,0.15)' :
+                          'rgba(239,68,68,0.15)',
                         color:
                           rt === MISS_TIMEOUT ? '#f87171' :
-                          rt < 350 ? '#4ade80' :
-                          rt < 500 ? '#fb923c' : '#f87171',
-                        border: `1px solid ${rt === MISS_TIMEOUT ? 'rgba(239,68,68,0.3)' : rt < 350 ? 'rgba(74,222,128,0.3)' : rt < 500 ? 'rgba(251,146,60,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                      }}
+                          rt <= 900 ? '#4ade80' :
+                          rt <= 1300 ? '#fb923c' :
+                          '#f87171',
+                        border: `1px solid ${
+                          rt === MISS_TIMEOUT ? 'rgba(239,68,68,0.3)' :
+                          rt <= 900 ? 'rgba(74,222,128,0.3)' :
+                          rt <= 1300 ? 'rgba(251,146,60,0.3)' :
+                          'rgba(239,68,68,0.3)'}`                      
+                        }}
                     >
                       {rt === MISS_TIMEOUT ? 'miss' : rt}
                     </div>
@@ -540,44 +692,294 @@ export function ReactionGame() {
                 </p>
               </div>
 
-              <div className="flex gap-3 w-full">
+              <div className="flex items-center gap-3 w-full">
+                {/* Back to Menu (small) */}
                 <button
                   onClick={() => {
-                    setPhase('countdown'); 
-                    setAnimals([]);         
-                    rtListRef.current = []; 
+                    setPhase('instructions');
+                    setDifficulty('easy');
+                    setAnimals([]);
+                    rtListRef.current = [];
+                    successfulRtListRef.current = [];
+                    wrongClicksRef.current = 0;
+                    missedTargetsRef.current = 0;
                   }}
-                  className="flex-1 py-4 rounded-2xl active:scale-95 transition-transform"
+                  className="px-4 py-3 rounded-2xl flex-shrink-0"
                   style={{
                     background: 'rgba(251,146,60,0.1)',
                     border: '1px solid rgba(251,146,60,0.25)',
                     color: '#fdba74',
-                    fontSize: '15px'
+                    fontSize: '13px'
+                  }}
+                >
+                  Back
+                </button>
+
+                {/* Retry (BIG CENTER) */}
+                <button
+                  onClick={() => {
+                    setPhase('countdown');
+                    setAnimals([]);
+                    rtListRef.current = [];
+                    successfulRtListRef.current = [];
+                    wrongClicksRef.current = 0;
+                    missedTargetsRef.current = 0;
+                  }}
+                  className="flex-1 py-3 rounded-2xl active:scale-95 transition-transform"
+                  style={{
+                    background: 'linear-gradient(135deg, #15803d, #16a34a)',
+                    border: '1px solid rgba(74,222,128,0.4)',
+                    color: '#ecfdf5',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    boxShadow: '0 0 25px rgba(74,222,128,0.25)'
                   }}
                 >
                   Retry
                 </button>
 
+                {/* History (small) */}
                 <button
-                  onClick={() => {
-                    setPhase('instructions');
-                    setDifficulty(null);    
-                    setAnimals([]);
-                    rtListRef.current = [];
-                  }}
-                  className="flex-1 py-4 rounded-2xl active:scale-95 transition-transform"
+                  onClick={() => setPhase('history')}
+                  className="px-4 py-3 rounded-2xl flex-shrink-0"
                   style={{
-                    background: 'rgba(251,146,60,0.1)',
-                    border: '1px solid rgba(251,146,60,0.25)',
-                    color: '#fdba74',
-                    fontSize: '15px'
+                    background: 'rgba(74,222,128,0.1)',
+                    border: '1px solid rgba(74,222,128,0.3)',
+                    color: '#4ade80',
+                    fontSize: '13px'
                   }}
                 >
-                  Back to Menu
+                  Performance History
                 </button>
+
               </div>
             </motion.div>
           )}
+        {phase === 'history' && (
+          <motion.div
+            key="history"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col flex-1 px-5"
+          >
+            <div className="mb-5 text-center">
+              <p style={{ color: '#fb923c', fontSize: '12px', letterSpacing: '0.1em', margin: '0 0 8px' }}>
+                PERFORMANCE HISTORY
+              </p>
+              <h1 style={{ color: '#fff7ed', fontSize: '22px', margin: '0 0 4px', fontWeight: 400 }}>
+                Reaction Trend
+              </h1>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              {[
+                { label: 'Sessions', value: allSessions.length, color: '#fb923c' },
+                {
+                  label: 'Best Score',
+                  value: allSessions.length ? Math.max(...allSessions.map(s => s.score)) : 0,
+                  color: '#4ade80'
+                },
+                {
+                  label: 'Avg RT',
+                  value: allSessions.length
+                    ? `${Math.round(allSessions.reduce((sum, s) => sum + s.avgMs, 0) / allSessions.length)}ms`
+                    : '0ms',
+                  color: '#fbbf24'
+                },
+              ].map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center py-3 rounded-2xl"
+                  style={{
+                    background: 'rgba(251,146,60,0.06)',
+                    border: '1px solid rgba(251,146,60,0.12)'
+                  }}
+                >
+                  <span style={{ color, fontSize: '20px', fontWeight: 500 }}>{value}</span>
+                  <span style={{ color: 'rgba(255,237,213,0.45)', fontSize: '10px' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {(() => {
+              const chartSessions = allSessions.slice(-20);
+              const scores = chartSessions.map(s => s.score);
+              const maxScore = scores.length > 0 ? Math.max(...scores) : 100;
+              const minScore = scores.length > 0 ? Math.min(...scores) : 0;
+              const range = maxScore - minScore;
+
+              const normalize = (score: number) =>
+                scores.length < 2 || range === 0
+                  ? 75
+                  : 15 + ((score - minScore) / range) * 85;
+
+              return (
+                <div
+                  className="rounded-2xl p-4 mb-5"
+                  style={{
+                    background: 'rgba(251,146,60,0.06)',
+                    border: '1px solid rgba(251,146,60,0.12)'
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <p style={{ color: 'rgba(255,237,213,0.5)', fontSize: '11px', margin: 0 }}>
+                      Accuracy per session
+                    </p>
+                    {chartSessions.length > 1 && (
+                      <span style={{ color: 'rgba(255,237,213,0.3)', fontSize: '9px' }}>
+                        {minScore}–{maxScore} range
+                      </span>
+                    )}
+                  </div>
+
+                  {chartSessions.length === 0 ? (
+                    <div style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: 'rgba(255,237,213,0.2)', fontSize: '12px' }}>No sessions yet</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-end gap-1.5" style={{ height: 90 }}>
+                      {chartSessions.map((s, i) => {
+                        const barH = normalize(s.score);
+                        const isLatest = i === chartSessions.length - 1;
+                        const barColor =
+                          s.score >= 70 ? '#4ade80' :
+                          s.score >= 45 ? '#fbbf24' :
+                          '#f87171';
+
+                        return (
+                          <div
+                            key={i}
+                            className="flex-1 flex flex-col items-center justify-end"
+                            style={{ height: '100%', position: 'relative' }}
+                          >
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: -16,
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                color: barColor,
+                                fontSize: '9px',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {s.score}
+                            </span>
+
+                            <div
+                              style={{
+                                width: '100%',
+                                maxWidth: 14,
+                                height: `${barH}%`,
+                                minHeight: 4,
+                                borderRadius: 4,
+                                background: barColor,
+                                opacity: isLatest ? 1 : 0.65,
+                                boxShadow: isLatest ? `0 0 6px ${barColor}88` : 'none',
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex justify-between mt-2">
+                    <span style={{ color: 'rgba(255,237,213,0.25)', fontSize: '9px' }}>Oldest</span>
+                    <span style={{ color: 'rgba(255,237,213,0.25)', fontSize: '9px' }}>Latest</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="flex-1 overflow-y-auto" style={{ maxHeight: 200 }}>
+              {allSessions.slice().reverse().slice(0, 15).map((s, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-2.5 px-3 mb-1.5 rounded-xl"
+                  style={{
+                    background: 'rgba(251,146,60,0.04)',
+                    border: '1px solid rgba(251,146,60,0.08)'
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 10,
+                        background:
+                          s.score >= 70 ? 'rgba(74,222,128,0.15)' :
+                          s.score >= 45 ? 'rgba(251,191,36,0.15)' :
+                          'rgba(248,113,113,0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color:
+                          s.score >= 70 ? '#4ade80' :
+                          s.score >= 45 ? '#fbbf24' :
+                          '#f87171',
+                        fontSize: '12px',
+                        fontWeight: 600
+                      }}
+                    >
+                      {s.score}
+                    </div>
+
+                    <div>
+                      <p style={{ color: 'rgba(255,237,213,0.7)', fontSize: '12px', margin: 0 }}>
+                        {s.difficulty} · {s.avgMs}ms avg RT
+                      </p>
+                      <p style={{ color: 'rgba(255,237,213,0.4)', fontSize: '10px', margin: 0 }}>
+                        {new Date(s.timestamp).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setPhase('result')}
+                className="flex-1 py-4 rounded-2xl active:scale-95 transition-transform"
+                style={{
+                  background: 'linear-gradient(135deg,#7c2d12,#c2410c)',
+                  color: '#fff7ed',
+                  fontSize: '15px',
+                  border: '1px solid rgba(251,146,60,0.3)'
+                }}
+              >
+                Back
+              </button>
+
+              <button
+                onClick={() => {
+                  setAllSessions([]);
+                  saveSessions([]);
+                  setPhase('result');
+                }}
+                className="py-4 px-5 rounded-2xl active:scale-95 transition-transform"
+                style={{
+                  background: 'rgba(248,113,113,0.1)',
+                  border: '1px solid rgba(248,113,113,0.2)',
+                  color: '#f87171',
+                  fontSize: '13px'
+                }}
+              >
+                Clear
+              </button>
+            </div>
+  </motion.div>
+)}
+          
         </AnimatePresence>
       </div>
     </NatureLayout>
