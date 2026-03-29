@@ -628,7 +628,7 @@ useEffect(() => {
       {/* ── Instructions ────────────────────────────────────────────────────── */}
       {phase === 'instructions' && (
         <div style={{ width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ marginBottom: 18 }}>
+          {/* <div style={{ marginBottom: 18 }}>
             <svg width="52" height="52" viewBox="0 0 52 52">
               <ellipse cx="26" cy="46" rx="18" ry="4" fill="rgba(56,189,248,0.1)" />
               <rect x="6"  y="38" width="40" height="9"  rx="4" fill="#0ea5e9" opacity="0.8"  />
@@ -637,25 +637,16 @@ useEffect(() => {
               <rect x="18" y="14" width="16" height="8"  rx="4" fill="#7dd3fc" />
               <rect x="21" y="8"  width="10" height="7"  rx="3" fill="#bae6fd" />
             </svg>
-          </div>
+          </div> */}
 
-          <p style={{ fontSize: 11, letterSpacing: '0.14em', color: '#38bdf8', marginBottom: 10, fontFamily: 'sans-serif' }}>FOCUS GAME</p>
+          <p style={{ fontSize: 25, letterSpacing: '0.14em', color: '#38bdf8', marginBottom: 10, fontFamily: 'sans-serif' }}>FOCUS GAME</p>
 
-          <h1 style={{ fontSize: 34, fontWeight: 400, margin: '0 0 6px', textAlign: 'center', color: '#e0f2fe', letterSpacing: '-0.01em' }}>
+          <h1 style={{ fontSize: 60, fontWeight: 400, margin: '0 0 6px', textAlign: 'center', color: '#e0f2fe', letterSpacing: '-0.01em' }}>
             Stone Stack
           </h1>
 
           <div style={{ width: 64, height: 1.5, background: 'linear-gradient(90deg, transparent, #38bdf8, transparent)', margin: '14px auto 22px' }} />
-
-          <p style={{ fontSize: 15, lineHeight: 1.75, textAlign: 'center', color: 'rgba(224,242,254,0.75)', marginBottom: 12 }}>
-            A mindful stacking game. Select irregular river stones and place them one by one — reaching the glowing green target line.
-          </p>
-          <p style={{ fontSize: 13, lineHeight: 1.7, textAlign: 'center', color: 'rgba(224,242,254,0.5)', marginBottom: 24, fontFamily: 'sans-serif' }}>
-            Every stone has a different shape and weight. Stack them off-center and the tower will sway, then fall. A glowing dot tracks your center of mass —{' '}
-            <span style={{ color: '#4ade80' }}>green</span> is balanced,{' '}
-            <span style={{ color: '#f87171' }}>red</span> means you're close to the edge.
-          </p>
-
+          
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 26 }}>
             {[
               ['①', 'Click a stone to select it'],
@@ -664,11 +655,19 @@ useEffect(() => {
               ['④', 'Reach the green line to win'],
             ].map(([n, t]) => (
               <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.13)', borderRadius: 12 }}>
-                <span style={{ fontSize: 13, color: '#38bdf8', fontFamily: 'sans-serif', minWidth: 18 }}>{n}</span>
-                <span style={{ fontSize: 13, color: 'rgba(224,242,254,0.62)', fontFamily: 'sans-serif' }}>{t}</span>
+                <span style={{ fontSize: 15, color: '#38bdf8', fontFamily: 'sans-serif', minWidth: 18 }}>{n}</span>
+                <span style={{ fontSize: 15, color: 'rgba(237, 240, 242, 0.62)', fontFamily: 'sans-serif' }}>{t}</span>
               </div>
             ))}
           </div>
+          
+          <p style={{ fontSize: 17, lineHeight: 1.75, textAlign: 'center', color: 'rgba(224,242,254,0.75)', marginBottom: 12 }}>
+            Every stone has a different shape and weight. Stack them off-center and the tower will sway, then fall. A glowing dot tracks your center of mass —{' '}
+            <span style={{ color: '#4ade80' }}>green</span> is balanced,{' '}
+            <span style={{ color: '#f87171' }}>red</span> means you're close to the edge.
+          </p>
+
+          
 
           <div style={{ display: 'flex', gap: 10, width: '100%', marginBottom: 26 }}>
             <StatBox label="best"     value={fmt(persistedBestScore)} />
@@ -683,7 +682,7 @@ useEffect(() => {
             color: '#e0f2fe', fontSize: 17, fontFamily: 'sans-serif', fontWeight: 500,
             cursor: 'pointer', boxShadow: '0 0 30px rgba(56,189,248,0.2)',
           }}>
-            Start Stacking
+            Start
           </button>
         </div>
       )}

@@ -355,31 +355,94 @@ export function CognitiveGame() {
           {phase === 'instructions' && (
             <motion.div key="instructions" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center flex-1 px-5">
               <div className="mb-5 text-center">
-                <p style={{ color: '#a78bfa', fontSize: '12px', letterSpacing: '0.1em', margin: '0 0 8px' }}>COGNITIVE TRAINING</p>
-                <h1 style={{ color: '#f5f3ff', fontSize: '26px', margin: '0 0 8px', fontWeight: 400 }}>Maze Navigator</h1>
+                <p style={{ color: '#a78bfa', fontSize: '25px', letterSpacing: '0.1em', margin: '0 0 8px' }}>COGNITIVE TRAINING</p>
+                <h1 style={{ color: '#f5f3ff', fontSize: '60px', margin: '0 0 8px', fontWeight: 400 }}>Maze Navigator</h1>
                 <div style={{ width: 48, height: 2, background: 'linear-gradient(90deg, transparent, #a78bfa, transparent)', margin: '0 auto 16px' }} />
               </div>
-
-              <div className="mb-6 p-5 rounded-2xl w-full" style={{ background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)' }}>
+              <div
+                className="mb-6 p-5 rounded-2xl"
+                style={{
+                  width: 400,                // fixed width
+                  margin: '0 auto',          // center horizontally
+                  background: 'rgba(167,139,250,0.06)',
+                  border: '1px solid rgba(167,139,250,0.2)',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {/* Progress bar */}
                 <div className="flex items-center gap-3 mb-3">
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(56,189,248,0.4)', border: '1px solid rgba(56,189,248,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🧑‍🚀</div>
-                  <div style={{ flex: 1, height: 2, background: 'linear-gradient(90deg, rgba(167,139,250,0.4), rgba(167,139,250,0.1))', borderRadius: 1 }} />
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(74,222,128,0.4)', border: '1px solid rgba(74,222,128,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⭐</div>
+                  <div
+                    style={{
+                      width: 32,              // slightly bigger for proportion
+                      height: 32,
+                      borderRadius: 8,
+                      background: 'rgba(56,189,248,0.4)',
+                      border: '1px solid rgba(56,189,248,0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 16,           // bigger emoji size
+                    }}
+                  >
+                    🧑‍🚀
+                  </div>
+
+                  <div
+                    style={{
+                      flex: 1,
+                      height: 4,              // thicker line for proportion
+                      background: 'linear-gradient(90deg, rgba(167,139,250,0.4), rgba(167,139,250,0.1))',
+                      borderRadius: 2,
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: 'rgba(74,222,128,0.4)',
+                      border: '1px solid rgba(74,222,128,0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 16,
+                    }}
+                  >
+                    ⭐
+                  </div>
                 </div>
+
+                {/* Levels */}
                 <div className="flex gap-3 justify-center">
                   {[1, 3, 5, 7, 9].map((lv) => (
                     <div key={lv} className="flex flex-col items-center">
-                      <span style={{ color: getDifficultyColor(lv), fontSize: '12px', fontWeight: 500 }}>{getLevelConfig(lv).rows}×{getLevelConfig(lv).cols}</span>
-                      <span style={{ color: 'rgba(245,243,255,0.3)', fontSize: '9px' }}>Lv{lv}</span>
+                      <span
+                        style={{
+                          color: getDifficultyColor(lv),
+                          fontSize: '13px',          // adjusted proportionally
+                          fontWeight: 500,
+                        }}
+                      >
+                        {getLevelConfig(lv).rows}×{getLevelConfig(lv).cols}
+                      </span>
+                      <span
+                        style={{
+                          color: 'rgba(245,243,255,0.3)',
+                          fontSize: '10px',          // slightly larger for clarity
+                        }}
+                      >
+                        Lv{lv}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <p style={{ color: 'rgba(245,243,255,0.7)', fontSize: '14px', lineHeight: 1.7, textAlign: 'center', maxWidth: 300, marginBottom: 8 }}>
+              <p style={{ color: 'rgba(245,243,255,0.7)', fontSize: '14px', lineHeight: 1.7, textAlign: 'center', maxWidth: 400, margin: 8 }}>
                 Each level generates a unique maze. Study it during the preview — then it <span style={{ color: '#fbbf24' }}>disappears completely</span>. Navigate from memory alone.
               </p>
-              <p style={{ color: 'rgba(245,243,255,0.5)', fontSize: '13px', lineHeight: 1.6, textAlign: 'center', maxWidth: 300, marginBottom: 28 }}>
+              <p style={{ color: 'rgba(245,243,255,0.5)', fontSize: '13px', lineHeight: 1.6, textAlign: 'center', maxWidth: 400, marginBottom: 28 }}>
                 Mazes grow larger each level with more preview time. Keep going as long as you can — stop whenever you want to see your results.
               </p>
 
@@ -399,8 +462,20 @@ export function CognitiveGame() {
               )}
 
               <div className="flex gap-3 w-full">
-                <button onClick={startSession} className="flex-1 py-5 rounded-2xl active:scale-95 transition-transform" style={{ background: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)', color: '#f5f3ff', fontSize: '17px', boxShadow: '0 0 30px rgba(167,139,250,0.2)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                  Begin Session
+                <button
+                  onClick={startSession}
+                  className="py-5 rounded-2xl active:scale-95 transition-transform"
+                  style={{
+                    width: '400px',           // fixed width
+                    margin: '0 auto',         // center horizontally
+                    background: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)',
+                    color: '#f5f3ff',
+                    fontSize: '17px',
+                    boxShadow: '0 0 30px rgba(167,139,250,0.2)',
+                    border: '1px solid rgba(167,139,250,0.3)',
+                  }}
+                >
+                  Start
                 </button>
                 {allSessions.length > 0 && (
                   <button onClick={() => setPhase('history')} className="py-5 px-5 rounded-2xl active:scale-95 transition-transform" style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', color: '#c4b5fd', fontSize: '15px' }}>

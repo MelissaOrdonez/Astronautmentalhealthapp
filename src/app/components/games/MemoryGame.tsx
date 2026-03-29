@@ -394,7 +394,7 @@ export function MemoryGame() {
                   fontSize: 16,
                   lineHeight: 1.6,
                   textAlign: 'center',
-                  maxWidth: 300,
+                  maxWidth: 400,
                   marginBottom: 20,
                 }}
               >
@@ -449,7 +449,7 @@ export function MemoryGame() {
                   color: 'rgba(254,243,199,0.72)',
                   fontSize: 15,
                   textAlign: 'center',
-                  maxWidth: 280,
+                  maxWidth: 400,
                   marginBottom: 24,
                 }}
               >
@@ -461,6 +461,8 @@ export function MemoryGame() {
                   onClick={startGame}
                   className="w-full py-5 rounded-2xl active:scale-95 transition-transform"
                   style={{
+                    width: 400, // fixed width
+                    margin: '0 auto', // centers horizontally
                     background: 'linear-gradient(135deg, #ca8a04 0%, #facc15 100%)',
                     color: '#1f1300',
                     fontSize: 17,

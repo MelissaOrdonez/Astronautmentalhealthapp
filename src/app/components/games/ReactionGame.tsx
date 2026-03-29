@@ -383,7 +383,7 @@ export function ReactionGame() {
             </div>
 
             {/* Game Description */}
-            <p style={{ color: 'rgba(255,237,213,0.7)', fontSize: '20px', lineHeight: 1.7, textAlign: 'center', maxWidth: 300, marginBottom: 20 }}>
+            <p style={{ color: 'rgba(255,237,213,0.7)', fontSize: '20px', lineHeight: 1.7, textAlign: 'center', maxWidth: 400, marginBottom: 20 }}>
               Animals will appear in the habitat. Only tap the <strong>target animals (birds 🐦)</strong> quickly when you see them.
               Other animals are distractions. Faster reactions and correct taps indicate higher alertness.
             </p>
@@ -392,7 +392,7 @@ export function ReactionGame() {
             <div className="flex gap-3 mb-8 flex-wrap justify-center">
               {['🐦', '🦊', '🐰', '🦉', '🦌', '🦔'].map((a) => (
                 <div key={a} style={{
-                  width: 52, height: 52, borderRadius: 14,
+                  width: 56, height: 52, borderRadius: 14,
                   background: 'rgba(251,146,60,0.08)',
                   border: '1.5px solid rgba(251,146,60,0.2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -403,43 +403,56 @@ export function ReactionGame() {
               ))}
             </div>
 
-            {/* Difficulty selection */}
-            <div className="flex gap-4 w-full mb-8">
-              {['easy', 'medium', 'hard'].map((level) => (
-                <button
-                  key={level}
-                  onClick={() => setDifficulty(level as 'easy' | 'medium' | 'hard')}
-                  className={`flex-1 py-3 rounded-2xl border ${
-                    difficulty === level
-                      ? 'border-orange-400 bg-orange-100 text-orange-600'
-                      : 'border-orange-200 text-orange-400'
-                  }`}
-                >
-                  {level.charAt(0).toUpperCase() + level.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, width: '100%', marginBottom: 26 }}>
-              <StatBox label="best" value={fmtPercent(persistedBestScore)} />
-              <StatBox label="average" value={fmtPercent(persistedAvgScore)} />
-              <StatBox label="sessions" value={String(persistedSessions)} />
-            </div>
-
-            <button
-              onClick={() => {
-                if (difficulty) setPhase('countdown');
-              }}
-              className="w-full py-5 rounded-2xl active:scale-95 transition-transform"
+            <div
               style={{
-                background: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)',
-                color: '#fff7ed', fontSize: '17px',
-                boxShadow: '0 0 30px rgba(251,146,60,0.2)',
-                border: '1px solid rgba(251,146,60,0.3)',
+                maxWidth: 400,        // maximum width of the whole section
+                margin: '0 auto',     // center horizontally
+                width: '100%',        // allow scaling on smaller screens
               }}
             >
-              Start
-            </button>
+              {/* Difficulty selection */}
+              <div className="flex gap-4 mb-8" style={{ width: '100%' }}>
+                {['easy', 'medium', 'hard'].map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setDifficulty(level as 'easy' | 'medium' | 'hard')}
+                    className={`py-3 rounded-2xl border flex-1`}
+                    style={{
+                      borderColor: difficulty === level ? '#fb923c' : '#fed7aa',
+                      background: difficulty === level ? '#ffedd5' : 'transparent',
+                      color: difficulty === level ? '#c2410c' : '#fb923c',
+                    }}
+                  >
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: 'flex', gap: 10, width: '100%', marginBottom: 26 }}>
+                <StatBox label="best" value={fmtPercent(persistedBestScore)} />
+                <StatBox label="average" value={fmtPercent(persistedAvgScore)} />
+                <StatBox label="sessions" value={String(persistedSessions)} />
+              </div>
+
+              {/* Start button */}
+              <button
+                onClick={() => {
+                  if (difficulty) setPhase('countdown');
+                }}
+                className="py-5 rounded-2xl active:scale-95 transition-transform"
+                style={{
+                  width: '100%',               // full width of container
+                  background: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)',
+                  color: '#fff7ed',
+                  fontSize: '17px',
+                  boxShadow: '0 0 30px rgba(251,146,60,0.2)',
+                  border: '1px solid rgba(251,146,60,0.3)',
+                }}
+              >
+                Start
+              </button>
+            </div>
           </motion.div>
         )}
 
