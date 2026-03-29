@@ -118,13 +118,30 @@ export function Dashboard() {
     cognitive: cognitive?.score ?? history[history.length - 1].cognitive,
   };
 
-  const trendData = history.map((h) => ({
-    date: h.date.replace('Mar ', ''),
-    Memory: h.memory,
-    Focus: h.focus,
-    Reaction: h.reaction,
-    'Cog. Load': h.cognitive,
-  }));
+ const today = new Date();
+const todayLabel = `${today.getMonth() === 2 ? 'Mar' : today.toLocaleString('en-US', { month: 'short' })} ${today.getDate()}`;
+
+const safeLast = history.length > 0 ? history[history.length - 1] : null;
+
+const liveTodayEntry = {
+  date: todayLabel,
+  memory: memory?.score ?? safeLast?.memory ?? 0,
+  focus: focus?.score ?? safeLast?.focus ?? 0,
+  reaction: reaction?.score ?? safeLast?.reaction ?? 0,
+  cognitive: cognitive?.score ?? safeLast?.cognitive ?? 0,
+};
+
+const historyWithoutToday = history.filter((h) => h.date !== todayLabel);
+
+const mergedTrendHistory = [...historyWithoutToday, liveTodayEntry].slice(-7);
+
+const trendData = mergedTrendHistory.map((h) => ({
+  date: h.date.replace('Mar ', '').replace('Apr ', '').replace('May ', '').replace('Jun ', '').replace('Jul ', '').replace('Aug ', '').replace('Sep ', '').replace('Oct ', '').replace('Nov ', '').replace('Dec ', '').replace('Jan ', '').replace('Feb ', ''),
+  Memory: h.memory,
+  Focus: h.focus,
+  Reaction: h.reaction,
+  'Cog. Load': h.cognitive,
+}));
 
   const insights = [
     memory && memory.score < 70 ? 'Memory function below baseline — pattern recall may be affected.' : null,
@@ -153,7 +170,7 @@ export function Dashboard() {
             Ecosystem Health
           </h1>
           <p style={{ color: 'rgba(209,250,229,0.45)', fontSize: '13px', margin: '4px 0 0' }}>
-            Day 47 · Updated today
+            Day 67 · Updated today
           </p>
         </motion.div>
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { NatureLayout } from '../NatureLayout';
+import { useGameContext } from '../../context/GameContext';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -193,6 +194,7 @@ function StatBox({ label, value }: { label: string; value: string }) {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function FocusGame() {
+  const { saveResult } = useGameContext();
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const animRef    = useRef<number>(0);
   const phaseRef   = useRef<Phase>('instructions');
@@ -451,7 +453,7 @@ export function FocusGame() {
 
   const finishGame = useCallback((reason: 'topple' | 'win' | 'out') => {
   const stackH = getStackHeight(stackRef.current);
-  const score  = Math.min(100, Math.round((stackH / TARGET_H) * 100));
+  const score = Math.min(100, Math.round((stackH / TARGET_H) * 100));
 
   const session: SessionResult = {
     score,
@@ -466,19 +468,33 @@ export function FocusGame() {
     return updated;
   });
 
+  saveResult('focus', {
+    score,
+    feedback:
+      score >= 70
+        ? 'Focus and balance stable'
+        : 'Sustained attention showing strain',
+    timestamp: session.timestamp,
+    details: {
+      height: session.height,
+      won: session.won,
+      endReason: reason,
+    },
+  });
+
   setSessions(p => p + 1);
   setTotalScore(p => p + score);
-  setBestScore(p => p === null || score > p ? score : p);
+  setBestScore(p => (p === null || score > p ? score : p));
 
   setResult({
     win: reason === 'win',
     score,
     reason:
       reason === 'win'
-        ? `Stacked ${Math.round(stackH)}px — target reached!`
+        ? `Stacked ${Math.round(stackH)}px, target reached!`
         : reason === 'topple'
-        ? `Center of mass drifted too far — collapsed at ${Math.round(stackH)}px.`
-        : `No stones left — reached ${Math.round(stackH)}px of ${TARGET_H}px.`,
+        ? `Center of mass drifted too far, collapsed at ${Math.round(stackH)}px.`
+        : `No stones left, reached ${Math.round(stackH)}px of ${TARGET_H}px.`,
   });
 
   if (reason === 'topple') {
@@ -492,8 +508,7 @@ export function FocusGame() {
       setPhase('result');
     }, 250);
   }
-}, []);
-
+}, [saveResult]);
   // ── Pointer events ─────────────────────────────────────────────────────────
 
 useEffect(() => {
@@ -941,3 +956,4 @@ useEffect(() => {
     </NatureLayout>
   );
 }
+
