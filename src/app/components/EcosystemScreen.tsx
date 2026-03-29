@@ -114,28 +114,28 @@ export function EcosystemScreen() {
       {/* Game Nodes */}
       <GameNode
         label="Mind Garden"
-        imageSrc="/images/plant.png"
+        imageSrc="/images/plant.png" 
         onClick={() => navigate('/memory')}
-        color="#80FF80" // soft lime
+        color="#fbffa1" // soft yellow
         style={{ bottom: '35%', left: '25%' }}
       />
       <GameNode
         label="Habitat Match"
         imageSrc="/images/deer.png"
         onClick={() => navigate('/reaction')}
-        color="#FF99CC" // soft pink
+        color="#FF5C00" // soft orange
         style={{ bottom: '35%', right: '25%' }}
       />
       <GameNode
         label="Stone Stacking"
-        imageSrc="/images/stone.png"
+        imageSrc="/images/earth.png"
         onClick={() => navigate('/focus')}
         color="#66FFFF" // soft cyan
         style={{ bottom: '50%', left: '38%' }}
       />
       <GameNode
         label="Maze Navigator"
-        imageSrc="/images/bird.png"
+        imageSrc="/images/spaceman.png"
         onClick={() => navigate('/cognitive')}
         color="#CC99FF" // soft violet
         style={{ bottom: '50%', right: '38%' }}
@@ -148,6 +148,7 @@ export function EcosystemScreen() {
         className="w-2/3 flex flex-col items-center justify-center rounded-3xl absolute bottom-8"
         style={{
           height: 160,
+          width: 400,
           background: '#220022', // dark purple
           border: '3px solid #CC99FF',
           boxShadow: '0 0 15px #CC99FF',
