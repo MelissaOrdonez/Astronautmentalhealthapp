@@ -14,7 +14,7 @@ const METRIC_CONFIG = [
     key: 'memory' as const,
     label: 'Memory',
     emoji: '🌳',
-    color: '#4ade80',
+    color: '#facc15',
     dimColor: 'rgba(74,222,128,0.3)',
     bg: 'rgba(74,222,128,0.07)',
     border: 'rgba(74,222,128,0.2)',
@@ -23,7 +23,7 @@ const METRIC_CONFIG = [
   {
     key: 'focus' as const,
     label: 'Focus',
-    emoji: '🌊',
+    emoji: '🌍',
     color: '#38bdf8',
     dimColor: 'rgba(56,189,248,0.3)',
     bg: 'rgba(56,189,248,0.07)',
@@ -33,7 +33,7 @@ const METRIC_CONFIG = [
   {
     key: 'reaction' as const,
     label: 'Reaction',
-    emoji: '🐾',
+    emoji: '🦌',
     color: '#fb923c',
     dimColor: 'rgba(251,146,60,0.3)',
     bg: 'rgba(251,146,60,0.07)',
@@ -43,7 +43,7 @@ const METRIC_CONFIG = [
   {
     key: 'cognitive' as const,
     label: 'Cognitive Load',
-    emoji: '🪨',
+    emoji: '🧑‍🚀',
     color: '#a78bfa',
     dimColor: 'rgba(167,139,250,0.3)',
     bg: 'rgba(167,139,250,0.07)',
@@ -75,7 +75,7 @@ function ScoreCircle({ score, color, size = 72 }: { score: number; color: string
         x={size / 2} y={size / 2 + 5}
         textAnchor="middle"
         fill={isHealthy ? color : '#fbbf24'}
-        fontSize={size === 72 ? '18' : '24'}
+        fontSize={size > 72 ? '24' : '18'}
         fontWeight="400"
       >
         {score}
