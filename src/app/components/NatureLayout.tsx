@@ -71,7 +71,7 @@ export function NatureLayout({ children, backTo = '/ecosystem', showBack = true 
             }}
           >
             <ChevronLeft size={20} color="#4ade80" />
-            <span style={{ color: '#86efac', fontSize: '14px' }}>Back To Ecosystem</span>
+            <span style={{ color: '#86efac', fontSize: '14px' }}>Back</span>
           </button>
         </div>
       )}

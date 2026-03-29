@@ -130,7 +130,7 @@ export function MeditationScreen() {
           className="flex items-center gap-2 px-4 py-3 rounded-2xl active:scale-95 transition-transform"
           style={{ background: 'rgba(4,14,10,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(74,222,128,0.18)' }}
         >
-          <span style={{ color: '#86efac', fontSize: '14px' }}>← Ecosystem</span>
+          <span style={{ color: '#86efac', fontSize: '14px' }}>← Back</span>
         </button>
         {cycles > 0 && (
           <div
