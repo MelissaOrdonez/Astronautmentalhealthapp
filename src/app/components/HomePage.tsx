@@ -45,7 +45,7 @@ export function HomePage() {
               margin: 0,
             }}
           >
-            CHANGE TITLE
+            Root2Stars
           </h1>
           <div
             style={{
@@ -61,12 +61,15 @@ export function HomePage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7, duration: 0.8 }}
           style={{
-            color: 'rgba(0, 0, 0)', fontSize: '40px',
-            textAlign: 'center', lineHeight: 1.65, marginBottom: 48,
+            color: '(0,0,0)', fontSize: '25px',
+            textAlign: 'center', lineHeight: 1.65, marginBottom: 20,
             maxWidth: 340,
+            fontWeight: 500,
+            letterSpacing: '0.5px',
           }}
         >
-          New Tag Line
+          Stay grounded, 
+            even in deep space.
         </motion.p>
 
         {/* Mission badge */}
@@ -88,7 +91,7 @@ export function HomePage() {
             }}
           />
           <span style={{ color: '#000000', fontSize: '15px', letterSpacing: '0.06em' }}>
-            Mission Day 47 · ISS Orbit
+            Mission Day 67 · ISS Orbit
           </span>
         </motion.div>
 
