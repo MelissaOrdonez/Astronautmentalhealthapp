@@ -456,13 +456,11 @@ export function MemoryGame() {
                 Watch the glowing tiles carefully, then repeat the full pattern in the same order.
               </p>
 
-              <div className="flex gap-3 w-full">
+              <div className="flex gap-3 w-full max-w-[450px] mx-auto">
                 <button
                   onClick={startGame}
                   className="w-full py-5 rounded-2xl active:scale-95 transition-transform"
                   style={{
-                    width: 400, // fixed width
-                    margin: '0 auto', // centers horizontally
                     background: 'linear-gradient(135deg, #ca8a04 0%, #facc15 100%)',
                     color: '#1f1300',
                     fontSize: 17,

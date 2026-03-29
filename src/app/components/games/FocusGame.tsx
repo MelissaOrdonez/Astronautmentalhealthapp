@@ -676,7 +676,7 @@ useEffect(() => {
           </div>
 
           <button onClick={startGame} style={{
-            width: '100%', padding: '15px 0', borderRadius: 18,
+            width: '100%', padding: '30px', borderRadius: 18, 
             background: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%)',
             border: '1px solid rgba(56,189,248,0.3)',
             color: '#e0f2fe', fontSize: 17, fontFamily: 'sans-serif', fontWeight: 500,

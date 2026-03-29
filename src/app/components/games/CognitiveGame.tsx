@@ -439,15 +439,15 @@ export function CognitiveGame() {
                 </div>
               </div>
 
-              <p style={{ color: 'rgba(245,243,255,0.7)', fontSize: '14px', lineHeight: 1.7, textAlign: 'center', maxWidth: 400, margin: 8 }}>
+              <p style={{ color: 'rgba(245,243,255,0.7)', fontSize: '17px', lineHeight: 1.7, textAlign: 'center', maxWidth: 400, margin: 8 }}>
                 Each level generates a unique maze. Study it during the preview — then it <span style={{ color: '#fbbf24' }}>disappears completely</span>. Navigate from memory alone.
               </p>
-              <p style={{ color: 'rgba(245,243,255,0.5)', fontSize: '13px', lineHeight: 1.6, textAlign: 'center', maxWidth: 400, marginBottom: 28 }}>
+              <p style={{ color: 'rgba(245,243,255,0.5)', fontSize: '15px', lineHeight: 1.6, textAlign: 'center', maxWidth: 400, marginBottom: 28 }}>
                 Mazes grow larger each level with more preview time. Keep going as long as you can — stop whenever you want to see your results.
               </p>
 
               {allSessions.length > 0 && (
-                <div className="flex gap-3 w-full mb-5">
+                <div className="flex gap-3 w-full mb-5 max-w-[450px]">
                   {[
                     { label: 'Sessions', value: allSessions.length, color: '#a78bfa' },
                     { label: 'Best Level', value: allTimeHighLevel, color: '#4ade80' },
@@ -461,7 +461,7 @@ export function CognitiveGame() {
                 </div>
               )}
 
-              <div className="flex gap-3 w-full">
+              <div className="flex gap-3 w-full max-w-[450px]">
                 <button
                   onClick={startSession}
                   className="py-5 rounded-2xl active:scale-95 transition-transform"
